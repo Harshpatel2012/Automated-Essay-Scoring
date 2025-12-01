@@ -1,5 +1,6 @@
 # ============================================
-# Automated Essay Scoring System 
+# Automated Essay Scoring System (Using aesdataset.csv)
+# Scores are already out of 100
 # ============================================
 
 # 1. Import Libraries
@@ -17,13 +18,15 @@ from scipy.sparse import hstack, csr_matrix
 # --------------------------------
 # 2. Load Dataset
 # --------------------------------
-df = pd.read_csv(r"C:\Users\harsh\OneDrive\Documents\essays.csv")
+# Use your new dataset
+df = pd.read_csv(r"C:\Users\harsh\OneDrive\Documents\aesdataset.csv")
+# If you move it to project folder, you can just use: df = pd.read_csv("aesdataset.csv")
 
 print("\nSample data:")
 print(df.head(), "\n")
 
 df['essay'] = df['essay'].astype(str)
-df['score'] = df['score'].astype(float)
+df['score'] = df['score'].astype(float)   # already 0–100 scale
 
 # --------------------------------
 # 3. Text Cleaning Function
@@ -54,7 +57,7 @@ def get_extra_features(text):
 # 5. Train–Test Split
 # --------------------------------
 X = df['essay']
-y = df['score']
+y = df['score']   # already 0–100
 
 X_train_raw, X_test_raw, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
@@ -102,9 +105,9 @@ print("RMSE:", rmse)
 print("R² Score:", r2)
 
 # --------------------------------
-# 10. Prediction Function (OUT OF 100)
+# 10. Prediction Function (OUT OF 100, DIRECT)
 # --------------------------------
-def score_essay_out_of_100(essay_text):
+def score_essay_out_of_100(essay_text: str) -> float:
     cleaned = clean_text(essay_text)
     tfidf_vec = vectorizer.transform([cleaned])
 
@@ -115,33 +118,32 @@ def score_essay_out_of_100(essay_text):
 
     predicted_score = model.predict(combined)[0]
 
-    # Convert to OUT OF 100 (assuming CSV is 1–5 scale)
-    score_out_of_100 = predicted_score * 20
-
-    return float(score_out_of_100)  # NO rounding
+    # ⚠️ No scaling needed, model already predicts 0–100
+    return float(predicted_score)
 
 # --------------------------------
-# 11. Take USER Essay Input
+# 11. Take USER Essay Input (Console Version)
 # --------------------------------
-print("\n========== AUTOMATED ESSAY SCORING (OUT OF 100) ==========")
-print("Paste your essay below. Type END on a new line and press Enter:\n")
+if __name__ == "__main__":
+    print("\n========== AUTOMATED ESSAY SCORING (OUT OF 100) ==========")
+    print("Paste your essay below. Type END on a new line and press Enter:\n")
 
-user_lines = []
-while True:
-    line = input()
-    if line.strip().upper() == "END":
-        break
-    user_lines.append(line)
+    user_lines = []
+    while True:
+        line = input()
+        if line.strip().upper() == "END":
+            break
+        user_lines.append(line)
 
-user_essay = " ".join(user_lines)
+    user_essay = " ".join(user_lines)
 
-if user_essay.strip() != "":
-    final_score = score_essay_out_of_100(user_essay)
+    if user_essay.strip() != "":
+        final_score = score_essay_out_of_100(user_essay)
 
-    print("\n-----------------------------------")
-    print("Your Essay:\n")
-    print(user_essay)
-    print("\nPredicted Score (Out of 100):", final_score)
-    print("-----------------------------------")
-else:
-    print("No essay entered.")
+        print("\n-----------------------------------")
+        print("Your Essay:\n")
+        print(user_essay)
+        print("\nPredicted Score (Out of 100):", round(final_score, 2))
+        print("-----------------------------------")
+    else:
+        print("No essay entered.")
