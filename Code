@@ -115,7 +115,7 @@ def score_essay_out_of_100(essay_text):
 
     predicted_score = model.predict(combined)[0]
 
-    # ✅ Convert to OUT OF 100 (assuming CSV is 1–5 scale)
+    # Convert to OUT OF 100 (assuming CSV is 1–5 scale)
     score_out_of_100 = predicted_score * 20
 
     return float(score_out_of_100)  # NO rounding
