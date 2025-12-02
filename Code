@@ -1,9 +1,9 @@
-# ============================================
-# Automated Essay Scoring System (Using aesdataset.csv)
-# Scores are already out of 100
-# ============================================
 
-# 1. Import Libraries
+# Automated Essay Scoring System - Web Version
+# Using aesdataset.csv (0–100 marks)
+
+
+from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
 import re
@@ -15,31 +15,32 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 from scipy.sparse import hstack, csr_matrix
 
-# --------------------------------
-# 2. Load Dataset
-# --------------------------------
-# Use your new dataset
-df = pd.read_csv(r"C:\Users\harsh\OneDrive\Documents\aesdataset.csv")
-# If you move it to project folder, you can just use: df = pd.read_csv("aesdataset.csv")
 
-print("\nSample data:")
-print(df.head(), "\n")
+# 1. Create Flask App
+
+app = Flask(__name__)
+
+
+# 2. Load Dataset & Train Model
+
+# Put aesdataset.csv in SAME folder as app.py
+df = pd.read_csv("aesdataset.csv")
 
 df['essay'] = df['essay'].astype(str)
-df['score'] = df['score'].astype(float)   # already 0–100 scale
+df['score'] = df['score'].astype(float)
 
-# --------------------------------
-# 3. Text Cleaning Function
-# --------------------------------
+
+# 3. Text Cleaning
+
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'[^a-zA-Z\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-# --------------------------------
-# 4. Extra Feature Function
-# --------------------------------
+
+# 4. Extra Features
+
 def get_extra_features(text):
     words = text.split()
     num_words = len(words)
@@ -53,19 +54,18 @@ def get_extra_features(text):
 
     return [num_words, avg_word_len, avg_sentence_len]
 
-# --------------------------------
+
 # 5. Train–Test Split
-# --------------------------------
+
 X = df['essay']
-y = df['score']   # already 0–100
+y = df['score']
 
 X_train_raw, X_test_raw, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# --------------------------------
 # 6. TF-IDF Features
-# --------------------------------
+
 X_train_clean = [clean_text(t) for t in X_train_raw]
 X_test_clean = [clean_text(t) for t in X_test_raw]
 
@@ -74,9 +74,9 @@ vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
 X_train_tfidf = vectorizer.fit_transform(X_train_clean)
 X_test_tfidf = vectorizer.transform(X_test_clean)
 
-# --------------------------------
+
 # 7. Extra Numeric Features
-# --------------------------------
+
 extra_train = np.array([get_extra_features(t) for t in X_train_raw])
 extra_test = np.array([get_extra_features(t) for t in X_test_raw])
 
@@ -86,17 +86,14 @@ extra_test_sparse = csr_matrix(extra_test)
 X_train_combined = hstack([X_train_tfidf, extra_train_sparse])
 X_test_combined = hstack([X_test_tfidf, extra_test_sparse])
 
-# --------------------------------
 # 8. Train Model
-# --------------------------------
+
 model = RandomForestRegressor(n_estimators=300, random_state=42)
 model.fit(X_train_combined, y_train)
 
-# --------------------------------
-# 9. Model Evaluation
-# --------------------------------
-y_pred = model.predict(X_test_combined)
+# 9. Evaluate Model (Terminal Only)
 
+y_pred = model.predict(X_test_combined)
 rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 r2 = r2_score(y_test, y_pred)
 
@@ -104,10 +101,10 @@ print("Model Evaluation:")
 print("RMSE:", rmse)
 print("R² Score:", r2)
 
-# --------------------------------
-# 10. Prediction Function (OUT OF 100, DIRECT)
-# --------------------------------
-def score_essay_out_of_100(essay_text: str) -> float:
+
+# 10. Prediction Function (OUT OF 100)
+
+def score_essay_out_of_100(essay_text):
     cleaned = clean_text(essay_text)
     tfidf_vec = vectorizer.transform([cleaned])
 
@@ -117,33 +114,28 @@ def score_essay_out_of_100(essay_text: str) -> float:
     combined = hstack([tfidf_vec, extra_sparse])
 
     predicted_score = model.predict(combined)[0]
-
-    # ⚠️ No scaling needed, model already predicts 0–100
     return float(predicted_score)
 
-# --------------------------------
-# 11. Take USER Essay Input (Console Version)
-# --------------------------------
+# 11. Flask Route
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    predicted_score = None
+    user_essay = ""
+
+    if request.method == "POST":
+        user_essay = request.form.get("essay_text", "")
+        if user_essay.strip():
+            predicted_score = round(score_essay_out_of_100(user_essay), 2)
+
+    return render_template(
+        "index.html",
+        predicted_score=predicted_score,
+        user_essay=user_essay
+    )
+
+
+# 12. Run Flask App
+
 if __name__ == "__main__":
-    print("\n========== AUTOMATED ESSAY SCORING (OUT OF 100) ==========")
-    print("Paste your essay below. Type END on a new line and press Enter:\n")
-
-    user_lines = []
-    while True:
-        line = input()
-        if line.strip().upper() == "END":
-            break
-        user_lines.append(line)
-
-    user_essay = " ".join(user_lines)
-
-    if user_essay.strip() != "":
-        final_score = score_essay_out_of_100(user_essay)
-
-        print("\n-----------------------------------")
-        print("Your Essay:\n")
-        print(user_essay)
-        print("\nPredicted Score (Out of 100):", round(final_score, 2))
-        print("-----------------------------------")
-    else:
-        print("No essay entered.")
+    app.run(debug=True)
